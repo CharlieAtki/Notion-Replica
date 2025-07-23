@@ -1,3 +1,4 @@
+// workspaceController.js
 import Workspace from "../models/Workspace.js";
 import mongoose from "mongoose";
 
@@ -15,19 +16,26 @@ export const getWorkspaceTableData = async (req, res) => {
         });
 
         if (!workspaces || workspaces.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "No Workspace data found for this organization.",
+            // If no workspace found, return a default empty structure including title and content
+            return res.status(200).json({ // Changed to 200 for initial empty state
+                success: true,
+                message: "No Workspace data found for this organization. Returning default.",
+                title: "Untitled Workspace", // Default title
+                content: "", // Default content
+                columns: [], // Empty columns
+                rows: [],    // Empty rows
             });
         }
 
         // Assuming you want to fetch the first (or only) workspace's table data
-        const workspaceTable = workspaces[0].page; // Access the 'page' object
+        const workspace = workspaces[0]; // Get the first workspace document
 
         return res.status(200).json({
             success: true,
-            columns: workspaceTable.columns, // Return columns directly
-            rows: workspaceTable.rows,       // Return rows directly
+            title: workspace.title,     // Return workspace title
+            content: workspace.content, // Return workspace content
+            columns: workspace.page.columns, // Return columns from the page object
+            rows: workspace.page.rows,       // Return rows from the page object
         });
 
     } catch (error) {
@@ -43,7 +51,7 @@ export const getWorkspaceTableData = async (req, res) => {
 export const updateOrCreateWorkspaceData = async (req, res) => {
     try {
         // 1. Validate incoming data and session information
-        const { orgId, title, content, columns, rows } = req.body;
+        const { orgId, title, content, columns, rows } = req.body; // Destructure title and content
 
         // Ensure user is authenticated and session has user ID
         if (!req.session.user || !req.session.user.id) {
@@ -84,13 +92,8 @@ export const updateOrCreateWorkspaceData = async (req, res) => {
         };
 
         // 3. Find and Update (or Create) the Workspace Document
-        // We'll try to find a workspace by orgId and title.
-        // If you intend to have only ONE workspace table per org, you might remove 'title' from the query.
-        // For simplicity, let's assume one primary workspace table per org for now.
-        // If you want to allow multiple tables per org, you'd need a unique identifier for each table.
+        // We'll try to find a workspace by orgId. Assuming one primary workspace table per org.
         const query = { orgId: orgId };
-        // If you want to allow updating a specific workspace by title for an org:
-        // const query = { orgId: orgId, title: title }; // Be careful with this if titles can change
 
         const updatedWorkspace = await Workspace.findOneAndUpdate(
             query,

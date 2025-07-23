@@ -1,3 +1,4 @@
+// workspaceTable.jsx
 import { useState, useEffect, useRef } from "react";
 
 const WorkspaceTable = () => {
@@ -13,7 +14,7 @@ const WorkspaceTable = () => {
     const menuRef = useRef(null);
 
     // State for current user information, used to determine organization ID for data fetching/saving
-    const [currentUserInfo, setCurrentUserInfo] = useState(null);
+    const [currentUserInfo, setCurrentUserInfo] = useState(null); // Initialize with null or an empty object
     // State for the workspace title, displayed and saved with the table data
     const [workspaceTitle, setWorkspaceTitle] = useState("Untitled Workspace");
     // State for optional workspace content/description
@@ -27,6 +28,7 @@ const WorkspaceTable = () => {
     const [rowMenuPosition, setRowMenuPosition] = useState({ top: 0, left: 0 });
     // Ref for detecting clicks outside the row menu to close it
     const rowMenuRef = useRef(null);
+
 
     // Base URL for API calls, fetched from environment variables
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -68,11 +70,13 @@ const WorkspaceTable = () => {
     useEffect(() => {
         const fetchWorkspaceTableData = async () => {
             // Only proceed if currentOrgId exists
-            if (!currentUserInfo?.currentOrgId) {
+            if (!currentUserInfo?.currentOrgId) { // Using optional chaining for safety
                 console.log("No organization ID available, skipping data fetch.");
                 // Clear existing data if no org ID, or on initial load before ID is known
                 setColumns([]);
                 setRows([]);
+                setWorkspaceTitle("Untitled Workspace"); // Reset title
+                setWorkspaceContent(""); // Reset content
                 return;
             }
 
@@ -91,12 +95,15 @@ const WorkspaceTable = () => {
                 // Handle non-OK HTTP responses (e.g., 401, 500)
                 if (!response.ok) {
                     console.error("Failed to fetch workspace data:", data.message || response.statusText);
-                    setColumns([]); // Clear data on fetch error
+                    // Clear data on fetch error
+                    setColumns([]);
                     setRows([]);
+                    setWorkspaceTitle("Untitled Workspace"); // Reset title
+                    setWorkspaceContent(""); // Reset content
                     return;
                 }
 
-                // Update states with fetched data, providing empty arrays as fallbacks
+                // Update states with fetched data, providing empty arrays/strings as fallbacks
                 setColumns(data.columns || []);
                 setRows(data.rows || []);
                 setWorkspaceTitle(data.title || "Untitled Workspace"); // Load existing title
@@ -106,6 +113,8 @@ const WorkspaceTable = () => {
                 console.error("Error fetching workspace table data:", error);
                 setColumns([]); // Clear on network error
                 setRows([]);
+                setWorkspaceTitle("Untitled Workspace"); // Reset title
+                setWorkspaceContent(""); // Reset content
             }
         };
 
@@ -147,8 +156,8 @@ const WorkspaceTable = () => {
                     },
                     body: JSON.stringify({
                         orgId: currentUserInfo.currentOrgId, // Organization ID for data association
-                        title: workspaceTitle,
-                        content: workspaceContent,
+                        title: workspaceTitle, // Pass the title to the backend
+                        content: workspaceContent, // Pass the content to the backend
                         columns: columns,
                         rows: rows,
                     }),
@@ -284,7 +293,10 @@ const WorkspaceTable = () => {
 
         // If changing to 'select' and no options exist, add default ones
         if (newType === "select" && !updated[columnIndex].options) {
-            updated[columnIndex].options = ["Option 1", "Option 2", "Option 3"];
+            updated[columnIndex].options = ["Option 1"]; // Start with one default option for new select columns
+        } else if (newType !== "select") {
+            // If changing away from select, remove options to keep data clean
+            delete updated[columnIndex].options;
         }
 
         setColumns(updated); // Update columns state
@@ -392,6 +404,39 @@ const WorkspaceTable = () => {
     };
 
     /**
+     * Handles adding a new option to a select column's options list.
+     * @param {number} columnIndex - The index of the column to update.
+     * @param {string} newOptionValue - The value of the new option to add.
+     */
+    const handleAddSelectOption = (columnIndex, newOptionValue) => {
+        if (!newOptionValue || newOptionValue.trim() === "") return;
+
+        const updatedColumns = [...columns];
+        const currentOptions = updatedColumns[columnIndex].options || [];
+        const trimmedNewOption = newOptionValue.trim();
+
+        // Prevent adding duplicate options
+        if (!currentOptions.includes(trimmedNewOption)) {
+            updatedColumns[columnIndex].options = [...currentOptions, trimmedNewOption];
+            setColumns(updatedColumns);
+        }
+    };
+
+    /**
+     * Handles removing an option from a select column's options list.
+     * @param {number} columnIndex - The index of the column to update.
+     * @param {string} optionToRemove - The option value to remove.
+     */
+    const handleRemoveSelectOption = (columnIndex, optionToRemove) => {
+        const updatedColumns = [...columns];
+        updatedColumns[columnIndex].options = (updatedColumns[columnIndex].options || []).filter(
+            (option) => option !== optionToRemove
+        );
+        setColumns(updatedColumns);
+    };
+
+
+    /**
      * Renders the appropriate input component for a table cell based on its column's input type.
      * @param {object} row - The current row object.
      * @param {object} column - The current column object (contains inputType).
@@ -421,6 +466,7 @@ const WorkspaceTable = () => {
                         className={`${baseClasses} cursor-pointer`}
                     >
                         <option value="">Select...</option> {/* Default empty option */}
+                        {/* Render options, ensuring column.options is an array before mapping */}
                         {column.options?.map((option, optIndex) => (
                             <option key={optIndex} value={option}>
                                 {option}
@@ -488,101 +534,150 @@ const WorkspaceTable = () => {
      * @param {number} columnIndex - The index of the column this menu belongs to.
      * @param {object} column - The column object for current state.
      */
-    const ColumnDropdownMenu = ({ columnIndex, column }) => (
-        <div
-            ref={menuRef} // Attach ref for click outside detection
-            className="fixed w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-[9999]"
-            style={{
-                top: `${columnMenuPosition.top}px`,
-                left: `${columnMenuPosition.left}px`
-            }}
-            onClick={(e) => e.stopPropagation()} // Prevent closing immediately on internal clicks
-        >
-            <div className="py-1">
-                <button
-                    onClick={() => handleRenameColumn(columnIndex)}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                    Rename
-                </button>
+    const ColumnDropdownMenu = ({ columnIndex, column }) => {
+        const [newOptionInput, setNewOptionInput] = useState(""); // State for the new option input field
 
-                <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600">
-                    Property Type
-                </div>
+        const handleAddOptionKeyDown = (e) => {
+            if (e.key === 'Enter' && newOptionInput.trim() !== '') {
+                e.preventDefault(); // Prevent form submission
+                handleAddSelectOption(columnIndex, newOptionInput);
+                setNewOptionInput(""); // Clear input after adding
+            }
+        };
 
-                {/* Buttons to change column input type, with active state highlighting */}
-                <button
-                    onClick={() => handleChangeColumnType(columnIndex, "text")}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        column.inputType === "text"
-                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                            : "text-gray-700 dark:text-gray-300"
-                    }`}
-                >
-                    📝 Text
-                </button>
-
-                <button
-                    onClick={() => handleChangeColumnType(columnIndex, "select")}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        column.inputType === "select"
-                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                            : "text-gray-700 dark:text-gray-300"
-                    }`}
-                >
-                    🏷️ Select
-                </button>
-
-                <button
-                    onClick={() => handleChangeColumnType(columnIndex, "number")}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        column.inputType === "number"
-                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                            : "text-gray-700 dark:text-gray-300"
-                    }`}
-                >
-                    🔢 Number
-                </button>
-
-                <button
-                    onClick={() => handleChangeColumnType(columnIndex, "date")}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        column.inputType === "date"
-                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                            : "text-gray-700 dark:text-gray-300"
-                    }`}
-                >
-                    📅 Date
-                </button>
-
-                <button
-                    onClick={() => handleChangeColumnType(columnIndex, "checkbox")}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        column.inputType === "checkbox"
-                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                            : "text-gray-700 dark:text-gray-300"
-                    }`}
-                >
-                    ☑️ Checkbox
-                </button>
-
-                <div className="border-t border-gray-200 dark:border-gray-600 mt-1">
+        return (
+            <div
+                ref={menuRef} // Attach ref for click outside detection
+                className="fixed w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-[9999]"
+                style={{
+                    top: `${columnMenuPosition.top}px`,
+                    left: `${columnMenuPosition.left}px`
+                }}
+                onClick={(e) => e.stopPropagation()} // Prevent closing immediately on internal clicks
+            >
+                <div className="py-1">
                     <button
-                        onClick={() => handleDuplicateColumn(columnIndex)}
+                        onClick={() => handleRenameColumn(columnIndex)}
                         className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                        Duplicate
+                        Rename
                     </button>
+
+                    <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600">
+                        Property Type
+                    </div>
+
+                    {/* Buttons to change column input type, with active state highlighting */}
                     <button
-                        onClick={() => handleDeleteColumn(columnIndex)}
-                        className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        onClick={() => handleChangeColumnType(columnIndex, "text")}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            column.inputType === "text"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                : "text-gray-700 dark:text-gray-300"
+                        }`}
                     >
-                        Delete
+                        📝 Text
                     </button>
+
+                    <button
+                        onClick={() => handleChangeColumnType(columnIndex, "select")}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            column.inputType === "select"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                : "text-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        🏷️ Select
+                    </button>
+
+                    {/* Inline select options editor for "select" type columns */}
+                    {column.inputType === "select" && (
+                        <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-600">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                Options:
+                            </div>
+                            <div className="flex flex-wrap gap-1 mb-2 max-h-24 overflow-y-auto">
+                                {(column.options || []).map((option, index) => (
+                                    <span
+                                        key={index}
+                                        className="inline-flex items-center bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded-full"
+                                    >
+                                        {option}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent closing menu when removing
+                                                handleRemoveSelectOption(columnIndex, option);
+                                            }}
+                                            className="ml-1 text-blue-800 dark:text-blue-200 hover:text-blue-900 dark:hover:text-blue-100 leading-none"
+                                        >
+                                            ✕
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                            <input
+                                type="text"
+                                value={newOptionInput}
+                                onChange={(e) => setNewOptionInput(e.target.value)}
+                                onKeyDown={handleAddOptionKeyDown}
+                                placeholder="Add option (press Enter)"
+                                className="w-full p-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                        </div>
+                    )}
+
+
+                    <button
+                        onClick={() => handleChangeColumnType(columnIndex, "number")}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            column.inputType === "number"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                : "text-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        🔢 Number
+                    </button>
+
+                    <button
+                        onClick={() => handleChangeColumnType(columnIndex, "date")}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            column.inputType === "date"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                : "text-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        📅 Date
+                    </button>
+
+                    <button
+                        onClick={() => handleChangeColumnType(columnIndex, "checkbox")}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            column.inputType === "checkbox"
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                : "text-gray-700 dark:text-gray-300"
+                        }`}
+                    >
+                        ☑️ Checkbox
+                    </button>
+
+                    <div className="border-t border-gray-200 dark:border-gray-600 mt-1">
+                        <button
+                            onClick={() => handleDuplicateColumn(columnIndex)}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Duplicate
+                        </button>
+                        <button
+                            onClick={() => handleDeleteColumn(columnIndex)}
+                            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                            Delete
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     /**
      * RowDropdownMenu Component: Renders the dropdown menu for row options (e.g., delete row).
@@ -697,9 +792,9 @@ const WorkspaceTable = () => {
                                     <button
                                         onClick={(e) => handleRowMenuClick(rowIndex, e)}
                                         // Position button absolutely within the cell
-                                        // Make it slightly visible (opacity-50) by default and fully visible on row hover (group-hover:opacity-100)
-                                        // Add transition for smooth hover effect
-                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 opacity-50 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        // Make it slightly more visible (opacity-75) by default and fully visible on row hover (group-hover:opacity-100)
+                                        // Added 'inline-flex' to ensure flex properties apply for centering '•••'
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 opacity-75 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         aria-label="Row options" // Accessibility label
                                     >
                                         •••

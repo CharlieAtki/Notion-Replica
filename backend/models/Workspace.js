@@ -1,3 +1,4 @@
+// Workspace.js
 import mongoose from 'mongoose'
 
 const workplaceSchema = mongoose.Schema({
@@ -6,25 +7,26 @@ const workplaceSchema = mongoose.Schema({
         ref: "Organisation",
         required: true,
     },
-    // Structure for storing both rows and column definitions
+    // Structure of how the record information should be stored
     page: {
-        rows: [{ // Define rows as an array of objects with flexible content
-            type: mongoose.Schema.Types.Mixed
-        }],
-        columns: [{ // Define columns as an array of objects
-            key: { type: String, required: true },
-            label: { type: String, required: true },
-            inputType: { type: String, required: true }, // e.g., "text", "select", "number"
-            options: [String] // Optional, for "select" inputType
-        }]
+        // Define columns as an array of Mixed type to allow flexible column definitions
+        columns: {
+            type: [mongoose.Schema.Types.Mixed],
+            default: []
+        },
+        // Define rows as an array of Mixed type to allow flexible row data based on dynamic columns
+        rows: {
+            type: [mongoose.Schema.Types.Mixed],
+            default: []
+        }
     },
     createdBy: { // ObjectId of user that created the workspace
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
     },
-    title: String, // Title of the workspace
-    content: String, // (could break down into smaller titles etc)
+    title: String, // Title of the workspace/organisation
+    content: String, // Additional content/description for the workspace
 },
     {
         timestamps: true,
