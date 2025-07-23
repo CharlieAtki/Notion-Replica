@@ -16,7 +16,11 @@ const userSchema = mongoose.Schema({
             name: String,
             role: String,
         }
-    ]
+    ],
+    currentOrgId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Organisation",
+    }
 },
     {
         timestamps: true,

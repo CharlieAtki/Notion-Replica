@@ -8,6 +8,10 @@ const WorkspaceTable = () => {
     const [columnMenuPosition, setColumnMenuPosition] = useState({ top: 0, left: 0 });
     const menuRef = useRef(null);
 
+    const [currentUserInfo, setCurrentUserInfo] = useState(""); // Holds current user info
+
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
     // Temp hardcoded data - change to dynamic (fetching from database)
     const tempRowData = [
         {
@@ -52,11 +56,79 @@ const WorkspaceTable = () => {
         }
     ];
 
-    // Use useEffect to set the initial state only once after the component mounts
+    // fetching user information for table conditional rendering
     useEffect(() => {
-        setColumns(tempColData);
-        setRows(tempRowData);
-    }, []); // Empty dependency array ensures this runs only once
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await fetch(`${backendUrl}/api/user-auth/fetchCurrentUser`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'content-type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                setCurrentUserInfo(result.user);
+
+            } catch (error) {
+                console.log(error);
+            }
+        }
+
+        fetchCurrentUser();
+    }, [])
+
+    useEffect(() => {
+        const fetchWorkspaceTableData = async () => {
+            // Only fetch if currentOrgId is available
+            if (!currentUserInfo.currentOrgId) {
+                console.log("No organization ID available, skipping data fetch.");
+                // Optionally clear table or show a message
+                setColumns([]);
+                setRows([]);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${backendUrl}/api/workspace/fetchWorkspaceTableData`, {
+                    method: "GET",
+                    credentials: 'include',
+                    headers: {
+                        'content-type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) { // Check response.ok for non-2xx status codes
+                    console.error("Failed to fetch workspace data:", data.message || response.statusText);
+                    // Handle specific errors, e.g., redirect to login if 401
+                    if (response.status === 401) {
+                         // You might want to trigger a logout or redirect to login here
+                         // navigate('/login'); // If using react-router-dom
+                    }
+                    // Keep existing columns/rows or set to empty on error
+                    setColumns([]);
+                    setRows([]);
+                    return;
+                }
+
+                // Assuming backend returns { success: true, columns: [...], rows: [...] }
+                setColumns(data.columns);
+                setRows(data.rows);
+
+            } catch (error) {
+                console.error("Error fetching workspace table data:", error);
+                setColumns([]); // Clear on network error
+                setRows([]);
+            }
+        };
+
+        fetchWorkspaceTableData();
+    }, [currentUserInfo.currentOrgId]); // Re-run effect if currentOrgId changes
 
     // Close dropdown when clicking outside
     useEffect(() => {

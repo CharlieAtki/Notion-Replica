@@ -53,6 +53,10 @@ export const userCreation = async (req, res) => {
         }]
         await user.save();
 
+        // Updating the currentOrgId
+        user.currentOrgId = org._id
+        await user.save();
+
         // Set session - Allows the user to login on account creation too
         req.session.user = {
             id: user._id,
@@ -63,7 +67,7 @@ export const userCreation = async (req, res) => {
                     role: "Owner"
                 }
             ],
-            currentOrg: org._id
+            currentOrgId: org._id
         };
 
         return res.status(201).send({
@@ -105,7 +109,8 @@ export const userLogin = async (req, res) => {
                 orgs: searchedUser.orgs.map(org => ({
                     orgId: org.orgId,
                     role: org.role
-                }))
+                })),
+                currentOrgId: searchedUser.currentOrgId
             };
 
             await new Promise((resolve, reject) => {

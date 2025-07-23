@@ -6,6 +6,7 @@ import session from "express-session";
 import MongoStore from "connect-mongo";
 import unAuthRoutes from "./routes/unAuthRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import workplaceRoutes from "./routes/workspaceRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -75,3 +76,4 @@ app.listen(PORT, () => {
 // Routes
 app.use('/api/user-unAuth', unAuthRoutes) // Routes for unauthenticated users
 app.use('/api/user-auth', userRoutes) // Routes for authenticated users
+app.use('/api/workspace', workplaceRoutes) // Routes for workspace (Table)
