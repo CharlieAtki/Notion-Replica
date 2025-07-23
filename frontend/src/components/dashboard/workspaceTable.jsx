@@ -160,6 +160,25 @@ const WorkspaceTable = () => {
         setActiveColumnMenu(null);
     };
 
+    const createNewColumn = () => {
+        const newColumnKey = `newColumn_${Date.now()}`; // Unique key for the new column
+        const newColumn = {
+            key: newColumnKey,
+            label: "New column",
+            inputType: "text",
+        };
+
+        // Update columns state
+        setColumns([...columns, newColumn]);
+
+        // Update rows state by adding an empty value for the new column in each row
+        const updatedRows = rows.map(row => ({
+            ...row,
+            [newColumnKey]: "" // Initialize with an empty string or default value
+        }));
+        setRows(updatedRows);
+    };
+
     // Function to render different input types based on column configuration
     const rowRenderInput = (row, column, rowIndex) => {
         const baseClasses = "w-full bg-transparent outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-md p-1";
@@ -344,7 +363,9 @@ const WorkspaceTable = () => {
             {/* Table Function Bar*/}
             <div className="flex items-center justify-between mb-2 px-8 pt-2 ">
                 <div className="flex items-center space-x-3">
-                    <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <button
+                        className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        onClick={createNewColumn}>
                         <span className="text-lg">+</span>
                     </button>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
@@ -356,7 +377,8 @@ const WorkspaceTable = () => {
                     </button>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <button className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
+                    <button
+                        className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
                         •••
                     </button>
                 </div>
