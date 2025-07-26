@@ -2,7 +2,8 @@ Session creation complete
 
 Need to:
 
-Add dynamic table data fetching from a database rather then hardcoded
+Add dynamic table data fetching from a database rather then hardcoded ✅
+
 Add record filtering and sorting in the table
 Add the ability for users to switch org accounts (current org)
 Enhance the UI, adding colour to the table + customisation for this feature

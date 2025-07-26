@@ -1,7 +1,7 @@
 // workspaceTable.jsx
 import { useState, useEffect, useRef } from "react";
 
-const WorkspaceTable = () => {
+const WorkspaceTable = ({ orgChangeKey }) => { // Add prop to trigger refresh on org change
     // State to manage the table's columns (array of column objects)
     const [columns, setColumns] = useState([]);
     // State to manage the table's rows (array of row objects, each representing a record)
@@ -29,7 +29,6 @@ const WorkspaceTable = () => {
     // Ref for detecting clicks outside the row menu to close it
     const rowMenuRef = useRef(null);
 
-
     // Base URL for API calls, fetched from environment variables
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -37,7 +36,7 @@ const WorkspaceTable = () => {
     const isInitialMount = useRef(true);
 
     /**
-     * Effect Hook: Fetches current user information on component mount.
+     * Effect Hook: Fetches current user information on component mount and when orgChangeKey changes.
      * This is crucial for obtaining the organization ID needed to fetch/save workspace data.
      */
     useEffect(() => {
@@ -53,6 +52,7 @@ const WorkspaceTable = () => {
                 });
 
                 const result = await response.json();
+                console.log('WorkspaceTable: Fetched user data:', result.user);
                 setCurrentUserInfo(result.user);
 
             } catch (error) {
@@ -61,10 +61,10 @@ const WorkspaceTable = () => {
         }
 
         fetchCurrentUser();
-    }, []); // Empty dependency array means this runs only once on initial component mount
+    }, [orgChangeKey]); // Add orgChangeKey as dependency to refetch user when org changes
 
     /**
-     * Effect Hook: Fetches workspace table data when the current organization ID becomes available.
+     * Effect Hook: Fetches workspace table data when the current organization ID becomes available or changes.
      * This loads the table structure (columns) and content (rows) from the backend.
      */
     useEffect(() => {
@@ -79,6 +79,8 @@ const WorkspaceTable = () => {
                 setWorkspaceContent(""); // Reset content
                 return;
             }
+
+            console.log('WorkspaceTable: Fetching data for org:', currentUserInfo.currentOrgId);
 
             try {
                 const response = await fetch(`${backendUrl}/api/workspace/fetchWorkspaceTableData`, {
@@ -103,11 +105,16 @@ const WorkspaceTable = () => {
                     return;
                 }
 
+                console.log('WorkspaceTable: Received data:', data);
+
                 // Update states with fetched data, providing empty arrays/strings as fallbacks
                 setColumns(data.columns || []);
                 setRows(data.rows || []);
                 setWorkspaceTitle(data.title || "Untitled Workspace"); // Load existing title
                 setWorkspaceContent(data.content || ""); // Load existing content
+
+                // Reset initial mount flag after first successful data load
+                isInitialMount.current = false;
 
             } catch (error) {
                 console.error("Error fetching workspace table data:", error);
@@ -120,9 +127,11 @@ const WorkspaceTable = () => {
 
         // Trigger fetch only when currentUserInfo.currentOrgId is valid
         if (currentUserInfo?.currentOrgId) {
+            // Reset initial mount flag when org changes to prevent auto-save during data loading
+            isInitialMount.current = true;
             fetchWorkspaceTableData();
         }
-    }, [currentUserInfo?.currentOrgId]); // Re-run this effect when currentOrgId changes
+    }, [currentUserInfo?.currentOrgId, orgChangeKey]); // Add orgChangeKey as dependency
 
     /**
      * Effect Hook: Implements auto-save functionality with a debounce mechanism.
@@ -132,7 +141,6 @@ const WorkspaceTable = () => {
     useEffect(() => {
         // Prevent saving on the very first render after initial data fetch
         if (isInitialMount.current) {
-            isInitialMount.current = false;
             return;
         }
 
@@ -147,6 +155,8 @@ const WorkspaceTable = () => {
         // Set a timeout to perform the save operation
         const saveDebounced = setTimeout(async () => {
             try {
+                console.log('WorkspaceTable: Saving data for org:', currentUserInfo.currentOrgId);
+
                 const response = await fetch(`${backendUrl}/api/workspace/updateOrCreateWorkspaceData`, {
                     method: "POST",
                     credentials: 'include',

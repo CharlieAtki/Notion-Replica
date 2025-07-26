@@ -15,6 +15,7 @@ const userSchema = mongoose.Schema({
             },
             name: String,
             role: String,
+            joinedAt: Date,
         }
     ],
     currentOrgId: {

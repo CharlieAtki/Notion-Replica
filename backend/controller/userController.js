@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import bcrypt from 'bcryptjs';
 import Organisation from "../models/Organisation.js"; // instead of 'bcrypt' - Had incompatibility errors with docker
+import mongoose from "mongoose";
 
 // Num of times the hashing algorithm is applied
 const saltRounds = 10;
@@ -214,6 +215,193 @@ export const userLogout = async (req, res) => {
         return res.status(400).send({
             success: false,
             message: error.message
+        });
+    }
+};
+
+export const switchOrganisation = async (req, res) => {
+    try {
+        // 1. Validate session and request data
+        if (!req.session.user || !req.session.user.id) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required. User session not found.",
+            });
+        }
+
+        const { orgId } = req.body;
+
+        if (!orgId) {
+            return res.status(400).json({
+                success: false,
+                message: "Organization ID is required.",
+            });
+        }
+
+        // Validate orgId format
+        if (!mongoose.Types.ObjectId.isValid(orgId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid organization ID format.",
+            });
+        }
+
+        // 2. Find the user
+        const user = await User.findById(req.session.user.id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // 3. Check if user is part of the requested organization
+        const targetOrg = user.orgs.find(org =>
+            org.orgId.toString() === orgId.toString()
+        );
+
+        if (!targetOrg) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not a member of this organization.",
+            });
+        }
+
+        // 4. Update user's current organization
+        user.currentOrgId = orgId;
+        await user.save();
+
+        // 5. Update session data
+        req.session.user.currentOrgId = orgId;
+
+        // 6. Return success response with organization info
+        return res.status(200).json({
+            success: true,
+            message: "Successfully switched organization.",
+            org: {
+                _id: targetOrg.orgId,
+                name: targetOrg.name,
+                description: targetOrg.description || null
+            },
+            user: {
+                id: user._id,
+                email: user.email,
+                currentOrgId: user.currentOrgId,
+                orgs: user.orgs
+            }
+        });
+
+    } catch (error) {
+        console.error("Error switching organization:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while switching organization.",
+            error: error.message,
+        });
+    }
+};
+
+export const addUserToOrgAndSwitch = async (req, res) => {
+    try {
+        // 1. Validate session and request data
+        if (!req.session.user || !req.session.user.id) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required. User session not found.",
+            });
+        }
+
+        const { orgCode } = req.body;
+
+        if (!orgCode) {
+            return res.status(400).json({
+                success: false,
+                message: "Organization code is required.",
+            });
+        }
+
+        // 2. Find the user
+        const user = await User.findById(req.session.user.id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // 3. Find the organization by code (assuming you have an Organization model)
+        // Note: You'll need to import your Organization model
+        // import Organization from "../models/Organization.js";
+
+        // For now, assuming orgCode is the organization ID
+        // You should replace this with proper organization lookup by code
+        if (!mongoose.Types.ObjectId.isValid(orgCode)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid organization code format.",
+            });
+        }
+
+        // 4. Check if user is already part of this organization
+        const existingOrg = user.orgs.find(org =>
+            org.orgId.toString() === orgCode.toString()
+        );
+
+        if (existingOrg) {
+            // User is already part of this org, just switch to it
+            user.currentOrgId = orgCode;
+            await user.save();
+            req.session.user.currentOrgId = orgCode;
+
+            return res.status(200).json({
+                success: true,
+                message: "Already a member. Successfully switched to organization.",
+                org: {
+                    _id: existingOrg.orgId,
+                    name: existingOrg.name,
+                    description: existingOrg.description || null
+                }
+            });
+        }
+
+        // 5. Add user to organization and switch
+        // Note: You'll need to implement the logic to:
+        // - Validate the organization exists and the code is correct
+        // - Add the user to the organization's member list
+        // - Add the organization to the user's orgs array
+
+        // For now, this is a placeholder implementation
+        // You should replace this with actual organization lookup and validation
+        const newOrgEntry = {
+            orgId: new mongoose.Types.ObjectId(orgCode),
+            name: "Organization Name", // Should come from Organization document
+            description: null, // Should come from Organization document
+            role: "member" // Default role
+        };
+
+        user.orgs.push(newOrgEntry);
+        user.currentOrgId = orgCode;
+        await user.save();
+
+        // Update session
+        req.session.user.currentOrgId = orgCode;
+
+        return res.status(200).json({
+            success: true,
+            message: "Successfully joined and switched to organization.",
+            org: {
+                _id: newOrgEntry.orgId,
+                name: newOrgEntry.name,
+                description: newOrgEntry.description
+            }
+        });
+
+    } catch (error) {
+        console.error("Error adding user to organization:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while joining organization.",
+            error: error.message,
         });
     }
 };

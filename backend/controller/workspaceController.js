@@ -1,6 +1,7 @@
 // workspaceController.js
 import Workspace from "../models/Workspace.js";
 import mongoose from "mongoose";
+import User from "../models/User.js";
 
 export const getWorkspaceTableData = async (req, res) => {
     try {
@@ -11,8 +12,16 @@ export const getWorkspaceTableData = async (req, res) => {
             });
         }
 
+        const user = await User.findOne({ email: req.session.user.email });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
         const workspaces = await Workspace.find({
-            orgId: req.session.user.currentOrgId,
+            orgId: user.currentOrgId,
         });
 
         if (!workspaces || workspaces.length === 0) {
